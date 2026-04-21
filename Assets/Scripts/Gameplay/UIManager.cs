@@ -21,7 +21,7 @@ public class UIManager : MonoBehaviour
 
     [Header("Gameplay UI - Bàn & Nút")]
     public TMP_Text potText;      
-    public TMP_Text bannerText;   
+    // Đã tiễn vong thằng bannerText theo yêu cầu của Tech Lead
     public Button foldButton;
     public Button callButton;
     public Button raiseButton;
@@ -33,6 +33,10 @@ public class UIManager : MonoBehaviour
 
     private List<GameObject> activeBotCards = new List<GameObject>();
     private List<UISeat> activeSeats = new List<UISeat>(); // Lưu trữ 7 cái ghế
+
+    [Header("Community Cards")]
+    public Image[] communityCards; // Chứa 5 lá bài trên bàn (Flop 1,2,3, Turn, River)
+    public Sprite cardBackSprite;  // Ảnh mặt lưng lá bài
 
     void Start()
     {
@@ -86,7 +90,7 @@ public class UIManager : MonoBehaviour
     private void UpdateGameplayUI(PokerTableSessionSnapshot state)
     {
         potText.text = "POT: $" + state.HandSnapshot.PotAmount.ToString();
-        bannerText.text = state.BannerMessage;
+        // Không còn bannerText.text = state.BannerMessage nữa!
 
         // --- ĐẺ GHẾ (Chỉ chạy 1 lần) ---
         if (activeSeats.Count == 0 && seatPrefab != null && seatContainer != null)
@@ -110,6 +114,30 @@ public class UIManager : MonoBehaviour
         {
             if (i < state.Seats.Count)
                 activeSeats[i].UpdateSeat(state.Seats[i]);
+        }
+
+        // --- XỬ LÝ 5 LÁ BÀI CHUNG TRÊN BÀN ---
+        var commCards = state.HandSnapshot.CommunityCards;
+        for (int i = 0; i < communityCards.Length; i++)
+        {
+            if (commCards != null && i < commCards.Count)
+            {
+                // Lá bài đã được lật (Flop, Turn, hoặc River)
+                communityCards[i].gameObject.SetActive(true);
+                
+                // Nạp ảnh trực tiếp từ ResourceKey của Backend
+                Sprite cardSprite = Resources.Load<Sprite>(commCards[i].ResourceKey);
+                if (cardSprite != null)
+                {
+                    communityCards[i].sprite = cardSprite;
+                }
+            }
+            else
+            {
+                // Lá bài chưa tới vòng lật -> Hiện mặt lưng
+                communityCards[i].gameObject.SetActive(true);
+                if (cardBackSprite != null) communityCards[i].sprite = cardBackSprite;
+            }
         }
 
         // --- CẬP NHẬT NÚT BẤM ---

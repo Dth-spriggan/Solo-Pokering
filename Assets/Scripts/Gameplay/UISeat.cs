@@ -58,8 +58,18 @@ public class UISeat : MonoBehaviour
         // 5. Hiển thị 2 lá bài tẩy (Hole Cards)
         if (seatData.HoleCards != null && seatData.HoleCards.Count == 2)
         {
-            if (card1 != null) card1.gameObject.SetActive(true);
-            if (card2 != null) card2.gameObject.SetActive(true);
+            if (card1 != null) 
+            {
+                card1.gameObject.SetActive(true);
+                // Nạp ảnh cho lá số 1
+                card1.sprite = Resources.Load<Sprite>(seatData.HoleCards[0].ResourceKey);
+            }
+            if (card2 != null) 
+            {
+                card2.gameObject.SetActive(true);
+                // Nạp ảnh cho lá số 2
+                card2.sprite = Resources.Load<Sprite>(seatData.HoleCards[1].ResourceKey);
+            }
         }
         else
         {
