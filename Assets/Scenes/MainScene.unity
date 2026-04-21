@@ -230,7 +230,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: -251.6001, y: -490}
+  m_AnchoredPosition: {x: -260.00003, y: -402.00003}
   m_SizeDelta: {x: 200, y: 60}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &44374677
@@ -351,7 +351,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: 0.0000095367, y: -490}
+  m_AnchoredPosition: {x: -8.399909, y: -402.00003}
   m_SizeDelta: {x: 200, y: 60}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &89651759
@@ -453,7 +453,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!224 &130948295
 RectTransform:
   m_ObjectHideFlags: 0
@@ -1493,8 +1493,8 @@ RectTransform:
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children:
-  - {fileID: 716960199}
   - {fileID: 367864481}
+  - {fileID: 716960199}
   m_Father: {fileID: 1660899747}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
@@ -1876,7 +1876,7 @@ GameObject:
   - component: {fileID: 716960201}
   - component: {fileID: 716960200}
   m_Layer: 5
-  m_Name: Text (TMP)
+  m_Name: Money
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -2174,7 +2174,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: 270.4, y: -490}
+  m_AnchoredPosition: {x: 262, y: -402}
   m_SizeDelta: {x: 200, y: 60}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &823182188
@@ -2988,7 +2988,7 @@ RectTransform:
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
   m_AnchoredPosition: {x: 0.000030518, y: 0}
-  m_SizeDelta: {x: 1320, y: 920}
+  m_SizeDelta: {x: 1080, y: 720}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &1391102791
 MonoBehaviour:
@@ -3412,7 +3412,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: 785, y: 450}
+  m_AnchoredPosition: {x: 778, y: 392}
   m_SizeDelta: {x: 270, y: 100}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &1459506190
@@ -4083,7 +4083,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 0
+  m_IsActive: 1
 --- !u!224 &1660899747
 RectTransform:
   m_ObjectHideFlags: 0
@@ -4263,14 +4263,20 @@ MonoBehaviour:
   botListContainer: {fileID: 0}
   botCardPrefab: {fileID: 0}
   searchInput: {fileID: 0}
-  potText: {fileID: 0}
-  bannerText: {fileID: 0}
-  foldButton: {fileID: 0}
-  callButton: {fileID: 0}
-  raiseButton: {fileID: 0}
-  callButtonText: {fileID: 0}
+  potText: {fileID: 716960200}
+  foldButton: {fileID: 89651759}
+  callButton: {fileID: 44374677}
+  raiseButton: {fileID: 823182188}
+  callButtonText: {fileID: 1608006496}
   seatContainer: {fileID: 0}
   seatPrefab: {fileID: 0}
+  communityCards:
+  - {fileID: 1692895237}
+  - {fileID: 25249550}
+  - {fileID: 993871062}
+  - {fileID: 1947751552}
+  - {fileID: 1126483173}
+  cardBackSprite: {fileID: -8963286302760908778, guid: 024780b3a6c04984991f1fd322c51b18, type: 3}
 --- !u!4 &1723390550
 Transform:
   m_ObjectHideFlags: 0
@@ -4652,7 +4658,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 0
+  m_IsActive: 1
 --- !u!224 &2030791503
 RectTransform:
   m_ObjectHideFlags: 0
