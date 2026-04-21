@@ -41,6 +41,8 @@ namespace SoloPokering.Gameplay
         private int completedHandCount;
         private bool handRunning;
 
+        private readonly List<BotAvatarProfile> waitingRoom = new List<BotAvatarProfile>();
+
         private sealed class SeatRuntimeState
         {
             public int SeatIndex;
@@ -175,45 +177,38 @@ namespace SoloPokering.Gameplay
         }
 
         public bool QueueAddBot(string profileId, out string feedback)
-        {
-            BotAvatarProfile profile = BotAvatarProfile.GetById(profileId);
-            if (profile == null)
-            {
-                feedback = "Bot profile was not found.";
-                sessionMessage = feedback;
-                return false;
-            }
+{
+    BotAvatarProfile profile = BotAvatarProfile.GetById(profileId);
+    if (profile == null) { feedback = "Bot profile not found."; return false; }
 
-            if (IsProfileAlreadyClaimed(profile.Id))
-            {
-                feedback = profile.DisplayName + " is already seated or queued.";
-                sessionMessage = feedback;
-                return false;
-            }
+    // Kiểm tra xem Bot này đã ngồi ở ghế hoặc đã nằm trong hàng chờ chưa
+    bool isAlreadyInWaitingRoom = waitingRoom.Exists(p => p.Id == profile.Id);
+    if (IsProfileAlreadyClaimed(profile.Id) || isAlreadyInWaitingRoom)
+    {
+        feedback = profile.DisplayName + " is already in line.";
+        return false;
+    }
 
-            int targetSeatIndex = FindBestSeatForJoin();
-            if (targetSeatIndex < 0)
-            {
-                feedback = "All 7 seats are already reserved.";
-                sessionMessage = feedback;
-                return false;
-            }
+    int targetSeatIndex = FindBestSeatForJoin();
+    
+    // NẾU HẾT GHẾ TRỐNG -> ĐẨY VÀO HÀNG CHỜ VÔ HẠN
+    if (targetSeatIndex < 0)
+    {
+        waitingRoom.Add(profile);
+        feedback = profile.DisplayName + " added to the global waiting queue.";
+    }
+    else
+    {
+        // Vẫn còn chỗ (hoặc chỗ đang chờ trống) -> Đặt chỗ vào ghế cụ thể
+        SeatRuntimeState targetSeat = seats[targetSeatIndex];
+        if (handRunning) targetSeat.PendingJoinProfile = profile;
+        else targetSeat.SetBot(profile, settings.StartingBank);
+        feedback = profile.DisplayName + " reserved seat " + targetSeatIndex;
+    }
 
-            SeatRuntimeState targetSeat = seats[targetSeatIndex];
-            if (handRunning)
-            {
-                targetSeat.PendingJoinProfile = profile;
-                feedback = profile.DisplayName + " will join seat " + targetSeatIndex + " after the current showdown.";
-            }
-            else
-            {
-                targetSeat.SetBot(profile, settings.StartingBank);
-                feedback = profile.DisplayName + " joined seat " + targetSeatIndex + ".";
-            }
-
-            sessionMessage = feedback;
-            return true;
-        }
+    sessionMessage = feedback;
+    return true;
+}
 
         public bool ToggleKickBot(int seatIndex, out string feedback)
         {
@@ -450,12 +445,14 @@ namespace SoloPokering.Gameplay
 
         private void ApplyPendingSeatChangesInternal()
         {
+            // Xóa những đứa đã đánh dấu rời bàn
             for (int i = 1; i < seats.Length; i++)
             {
                 if (seats[i].PendingLeave)
                     seats[i].ClearBot();
             }
 
+            // Nhét những đứa đã chốt ghế từ trước vào
             for (int i = 1; i < seats.Length; i++)
             {
                 if (seats[i].PendingJoinProfile != null)
@@ -463,6 +460,16 @@ namespace SoloPokering.Gameplay
                     BotAvatarProfile profile = seats[i].PendingJoinProfile;
                     seats[i].SetBot(profile, settings.StartingBank);
                 }
+            }
+
+            // BỐC TỪ HÀNG CHỜ VÔ HẠN VÀO CÁC GHẾ CÒN TRỐNG
+            while (waitingRoom.Count > 0)
+            {
+                int emptySeat = FindBestSeatForJoin();
+                if (emptySeat < 0) break; // Hết ghế trống thì ngưng
+
+                seats[emptySeat].SetBot(waitingRoom[0], settings.StartingBank);
+                waitingRoom.RemoveAt(0); // Xóa khỏi hàng chờ
             }
         }
 
@@ -568,6 +575,9 @@ namespace SoloPokering.Gameplay
                 bool isQueued = false;
                 bool isMarkedForLeave = false;
 
+                // Kiểm tra xem nó có đang rớt vào list phòng chờ không
+                bool isWaitingInRoom = waitingRoom.Exists(p => p.Id == profile.Id);
+
                 int seatedIndex = FindSeatByProfileId(profile.Id);
                 if (seatedIndex >= 0)
                 {
@@ -589,10 +599,18 @@ namespace SoloPokering.Gameplay
                         availabilityLabel = "Queued for seat " + queuedIndex;
                         targetSeat = queuedIndex;
                     }
+                    else if (isWaitingInRoom)
+                    {
+                        // Đang nằm trong hàng chờ vô hạn
+                        isQueued = true;
+                        canAdd = false;
+                        availabilityLabel = "In waiting room";
+                    }
                     else if (targetSeat < 0)
                     {
-                        canAdd = false;
-                        availabilityLabel = "Table full";
+                        // Bàn đã đầy -> Vẫn cho phép bấm Add để ném vào Waiting Room
+                        canAdd = true;
+                        availabilityLabel = "Join waiting room";
                     }
                     else if (handRunning)
                     {
@@ -619,7 +637,7 @@ namespace SoloPokering.Gameplay
                     IsSeated = isSeated,
                     IsQueued = isQueued,
                     IsMarkedForLeave = isMarkedForLeave,
-                    WillReplaceSeat = targetSeat >= 0 && seats[targetSeat].PendingLeave,
+                    WillReplaceSeat = targetSeat >= 0 && (targetSeat < seats.Length) && seats[targetSeat].PendingLeave,
                     AvailabilityLabel = availabilityLabel,
                     CurrentSeatIndex = isSeated ? seatedIndex : (isQueued ? targetSeat : -1),
                     TargetSeatIndex = targetSeat
@@ -628,7 +646,6 @@ namespace SoloPokering.Gameplay
 
             return results;
         }
-
         private PokerPlayerSnapshot FindHandPlayerForSeat(int seatIndex)
         {
             if (currentHandSnapshot == null)

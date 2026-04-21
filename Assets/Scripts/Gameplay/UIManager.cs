@@ -54,10 +54,12 @@ public class UIManager : MonoBehaviour
         lobbyPanel.SetActive(!isPlaying);
         gameplayPanel.SetActive(isPlaying);
 
+        // LUÔN CẬP NHẬT HÀNG CHỜ (Bất kể đang chơi hay ở sảnh)
+        UpdateBotList(state.BotQueryResults);
+
         if (!isPlaying)
         {
             startButton.interactable = state.CanStartGame;
-            UpdateBotList(state.BotQueryResults);
         }
         else
         {
@@ -69,21 +71,44 @@ public class UIManager : MonoBehaviour
 
     private void UpdateBotList(List<BotAvatarProfileSnapshot> bots)
     {
-        if (activeBotCards.Count == bots.Count) 
+        // LỌC: Chỉ lấy những con Bot đang ở trạng thái HÀNG CHỜ (IsQueued)
+        List<BotAvatarProfileSnapshot> queuedBots = bots.FindAll(b => b.IsQueued);
+
+        // KIỂM TRA ĐÚNG SỐ LƯỢNG QUEUED BOTS
+        if (activeBotCards.Count == queuedBots.Count) 
         {
-            for (int i = 0; i < bots.Count; i++)
-                activeBotCards[i].GetComponent<BotCardUI>().SetupCard(bots[i], gameController);
+            for (int i = 0; i < queuedBots.Count; i++)
+                activeBotCards[i].GetComponent<BotCardUI>().SetupCard(queuedBots[i], gameController);
             return;
         }
 
         foreach (GameObject card in activeBotCards) Destroy(card);
         activeBotCards.Clear();
 
-        foreach (var botData in bots)
+        // ĐẺ THẺ DỰA TRÊN DANH SÁCH ĐÃ LỌC
+        foreach (var botData in queuedBots)
         {
             GameObject newCard = Instantiate(botCardPrefab, botListContainer);
             newCard.GetComponent<BotCardUI>().SetupCard(botData, gameController);
             activeBotCards.Add(newCard);
+        }
+    }
+
+    public void OnClickAddRandomBot()
+    {
+        if (gameController == null || gameController.CurrentState == null) return;
+
+        // Tìm danh sách các Bot chưa có mặt trên bàn và chưa nằm trong hàng chờ
+        List<BotAvatarProfileSnapshot> pool = gameController.CurrentState.BotQueryResults.FindAll(b => b.CanAdd);
+
+        if (pool.Count > 0)
+        {
+            int randomIndex = Random.Range(0, pool.Count);
+            gameController.QueueAddBot(pool[randomIndex].Id);
+        }
+        else
+        {
+            Debug.Log("Không còn Bot nào khả dụng để thêm!");
         }
     }
 
