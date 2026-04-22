@@ -49,6 +49,8 @@ namespace SoloPokering.Gameplay
         public bool IsBot;
         public bool IsBusted;
         public bool IsDealer;
+        public bool IsSmallBlind; 
+        public bool IsBigBlind;
         public bool IsCurrentTurn;
         public bool IsFolded;
         public bool IsPendingJoin;

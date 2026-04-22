@@ -148,6 +148,12 @@ namespace SoloPokering.Gameplay
             currentState = session.GetSnapshot();
             UpdateLastFeedbackFromState();
         }
+        public void ResetSession()
+        {
+            session = null;
+            EnsureSession();
+            RefreshSnapshot();
+        }
 
         private void EnsureSession()
         {

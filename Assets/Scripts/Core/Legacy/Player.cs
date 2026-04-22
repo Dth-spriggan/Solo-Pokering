@@ -383,6 +383,7 @@ namespace Holdem
         {
             this.ChipStack += mainPot.Amount;
             this.Message = this.Name + " wins the pot!";
+            this.SimplifiedMessage = "WINNER";
         }
         //set isBusted to true if the player busted out
         public void Leave()

@@ -54,6 +54,8 @@ namespace SoloPokering.Gameplay
         public string Name { get; set; }
         public bool IsHuman { get; set; }
         public bool IsDealer { get; set; }
+        public bool IsSmallBlind { get; set; }
+        public bool IsBigBlind { get; set; }
         public bool IsCurrentTurn { get; set; }
         public bool IsFolded { get; set; }
         public bool IsBusted { get; set; }

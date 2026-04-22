@@ -16,11 +16,15 @@ public class UISeat : MonoBehaviour
     public Image card2;             // Lá bài 2
     public GameObject timingRing;   // Vòng đếm ngược lúc đến lượt
 
+    [Header("Blind Mark (Huy hiệu SB/BB)")]
+    public GameObject blindBadgeObj; // Cái cục nền chứa chữ (Image)
+    public TMP_Text blindText;       // Chữ bên trong (SB hoặc BB)
+
     // Hàm này sẽ được UIManager gọi liên tục để bơm dữ liệu vào
     public void UpdateSeat(PokerTableSeatSnapshot seatData)
     {
         // 1. Ghế trống và không có ai đang đợi vào -> Tắt tàng hình luôn
-        if (!seatData.IsOccupied && !seatData.IsPendingJoin)
+        if (!seatData.IsOccupied)
         {
             gameObject.SetActive(false);
             return;
@@ -39,6 +43,30 @@ public class UISeat : MonoBehaviour
             
             // Đổ màu luôn cho cái nền của Mask để đồng bộ
             if (avatarMaskImage != null) avatarMaskImage.color = accentColor;
+        }
+
+        if (blindBadgeObj != null && blindText != null)
+        {
+            // Kiểm tra thuộc tính từ Backend (Ông check lại tên biến cho chuẩn nhé)
+            if (seatData.IsBigBlind) 
+            {
+                blindBadgeObj.SetActive(true);
+                blindText.text = "BB";
+            }
+            else if (seatData.IsSmallBlind) 
+            {
+                blindBadgeObj.SetActive(true);
+                blindText.text = "SB";
+            }
+            else if (seatData.IsDealer) // Nếu Backend có cờ Dealer thì show luôn chữ D
+            {
+                blindBadgeObj.SetActive(true);
+                blindText.text = "D";
+            }
+            else
+            {
+                blindBadgeObj.SetActive(false); // Ghế thường thì tắt huy hiệu
+            }
         }
 
         // 4. Xử lý cái bảng Trạng Thái (Status)
@@ -61,14 +89,12 @@ public class UISeat : MonoBehaviour
             if (card1 != null) 
             {
                 card1.gameObject.SetActive(true);
-                // Nạp ảnh cho lá số 1
-                card1.sprite = Resources.Load<Sprite>(seatData.HoleCards[0].ResourceKey);
+                card1.sprite = LoadCardSprite(seatData.HoleCards[0].ResourceKey);
             }
             if (card2 != null) 
             {
                 card2.gameObject.SetActive(true);
-                // Nạp ảnh cho lá số 2
-                card2.sprite = Resources.Load<Sprite>(seatData.HoleCards[1].ResourceKey);
+                card2.sprite = LoadCardSprite(seatData.HoleCards[1].ResourceKey);
             }
         }
         else
@@ -82,5 +108,17 @@ public class UISeat : MonoBehaviour
         {
             timingRing.SetActive(seatData.IsCurrentTurn);
         }
+    }
+
+    private Sprite LoadCardSprite(string resourceKey)
+    {
+        if (string.IsNullOrWhiteSpace(resourceKey))
+            return null;
+
+        Sprite[] subSprites = Resources.LoadAll<Sprite>(resourceKey);
+        if (subSprites != null && subSprites.Length > 0)
+            return subSprites[0];
+
+        return Resources.Load<Sprite>(resourceKey);
     }
 }

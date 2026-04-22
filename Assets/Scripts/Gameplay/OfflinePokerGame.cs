@@ -285,6 +285,9 @@ namespace SoloPokering.Gameplay
             snapshot.BigBlind = table.BigBlind;
             snapshot.HumanActionOptions = BuildHumanActionOptions();
 
+            int sbIndex = table.incrementIndex(table.getDealerPosition());
+            int bbIndex = table.incrementIndex(sbIndex);
+
             for (int i = 0; i < table.getCommunityCards().Count(); i++)
                 snapshot.CommunityCards.Add(BuildCardSnapshot(table.getCommunityCards()[i]));
 
@@ -297,6 +300,8 @@ namespace SoloPokering.Gameplay
                     Name = player.Name,
                     IsHuman = i == 0,
                     IsDealer = i == table.getDealerPosition(),
+                    IsSmallBlind = i == sbIndex,
+                    IsBigBlind = i == bbIndex,
                     IsCurrentTurn = i == table.getCurrentIndex(),
                     IsFolded = player.IsFolded(),
                     IsBusted = player.isbusted,
@@ -561,7 +566,7 @@ namespace SoloPokering.Gameplay
 
             options.CanFold = true;
             options.CanAllIn = human.ChipStack > 0;
-            options.CanCheckOrCall = amountToCall <= human.ChipStack;
+            options.CanCheckOrCall = true;
             options.CanRaiseOrBet = table.getPot().MinimumRaise <= maxRaiseOrBet;
             options.AmountToCall = amountToCall;
             options.MinimumRaise = table.getPot().MinimumRaise;

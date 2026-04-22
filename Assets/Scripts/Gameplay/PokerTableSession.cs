@@ -541,6 +541,8 @@ namespace SoloPokering.Gameplay
             {
                 snapshot.ChipStack = seat.ChipStack;
                 snapshot.IsDealer = handPlayer != null && handPlayer.IsDealer;
+                snapshot.IsSmallBlind = handPlayer != null && handPlayer.IsSmallBlind;
+                snapshot.IsBigBlind = handPlayer != null && handPlayer.IsBigBlind;
                 snapshot.IsCurrentTurn = handPlayer != null && handPlayer.IsCurrentTurn;
                 snapshot.IsFolded = handPlayer != null && handPlayer.IsFolded;
                 snapshot.AmountInPot = handPlayer != null ? handPlayer.AmountInPot : 0;
@@ -857,6 +859,25 @@ namespace SoloPokering.Gameplay
 
             if (handPlayer != null)
             {
+                // ---> 1. LOGIC CHO NGƯỜI THẮNG (Sẽ in ra: WINNER: ACES FULL OF KINGS)
+                if (handPlayer.ActionText == "WINNER")
+                {
+                    if (!string.IsNullOrWhiteSpace(handPlayer.BestHandText))
+                        return "WINNER: " + handPlayer.BestHandText.ToUpper();
+                    return "WINNER";
+                }
+
+                // ---> 2. LOGIC LÚC LẬT BÀI CHO NGƯỜI THUA (Sẽ in ra: PAIR OF TENS)
+                if (currentHandSnapshot != null && 
+                   (currentHandSnapshot.Phase == PokerGamePhase.Showdown || 
+                    currentHandSnapshot.Phase == PokerGamePhase.HandComplete || 
+                    currentHandSnapshot.Phase == PokerGamePhase.MatchComplete))
+                {
+                    // Nếu không Fold thì hiện tên bộ bài đang cầm
+                    if (!handPlayer.IsFolded && !string.IsNullOrWhiteSpace(handPlayer.BestHandText))
+                        return handPlayer.BestHandText.ToUpper();
+                }
+                
                 if (handPlayer.IsCurrentTurn)
                     return "Acting";
 

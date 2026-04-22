@@ -99,26 +99,16 @@ namespace Holdem
                 return "No Poker Hand is Found";
             switch (this.handValue[0])
             {
-                case 1:
-                    return Card.rankToString(handValue[1]) + " High";
-                case 2:
-                    return "Pair of " + Card.rankToString(handValue[1]) + "s";
-                case 3:
-                    return "Two Pair: "+Card.rankToString(handValue[1]) + "s over " + Card.rankToString(handValue[2])+"s";
-                case 4:
-                    return "Three " + Card.rankToString(handValue[1]) + "s";
-                case 5:
-                    return Card.rankToString(handValue[1]) + " High Straight";
-                case 6:
-                    return Card.rankToString(handValue[1]) + " High Flush";
-                case 7:
-                    return Card.rankToString(handValue[1]) + "s Full of " + Card.rankToString(handValue[2]) + "s";
-                case 8:
-                    return "Quad " + Card.rankToString(handValue[1]) + "s";
-                case 9:
-                    return Card.rankToString(handValue[1]) + " High Straight Flush";
-                default:
-                    return "Royal Flush";
+                case 1: return "High Card";
+                case 2: return "One Pair";
+                case 3: return "Two Pair";
+                case 4: return "Three of a Kind";
+                case 5: return "Straight";
+                case 6: return "Flush";
+                case 7: return "Full House";
+                case 8: return "Four of a Kind";
+                case 9: return "Straight Flush";
+                default: return "Royal Flush";
             }
         }
         //check is the hands are equal, NOT their value
