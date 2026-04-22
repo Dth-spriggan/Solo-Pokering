@@ -150,7 +150,7 @@ namespace SoloPokering.Gameplay
 
             RecordAction(bannerMessage);
 
-            return AutoPlayUntilHumanTurn();
+            return GetSnapshot();
         }
 
         public PokerGameSnapshot AutoPlayUntilHumanTurn()
@@ -164,7 +164,7 @@ namespace SoloPokering.Gameplay
                 if (safetyCounter > 256)
                     throw new InvalidOperationException("The poker loop exceeded its safety limit.");
             }
-
+            
             return GetSnapshot();
         }
 
@@ -190,7 +190,7 @@ namespace SoloPokering.Gameplay
             bannerMessage = table[0].Message;
             waitingForHumanInput = false;
 
-            return AutoPlayUntilHumanTurn();
+            return GetSnapshot();
         }
 
         public PokerGameSnapshot HumanCheckOrCall()
@@ -206,7 +206,7 @@ namespace SoloPokering.Gameplay
             bannerMessage = table[0].Message;
             waitingForHumanInput = false;
 
-            return AutoPlayUntilHumanTurn();
+            return GetSnapshot();
         }
 
         public PokerGameSnapshot HumanRaiseOrBet(int amount)
@@ -231,7 +231,7 @@ namespace SoloPokering.Gameplay
             bannerMessage = table[0].Message;
             waitingForHumanInput = false;
 
-            return AutoPlayUntilHumanTurn();
+            return GetSnapshot();
         }
 
         public PokerGameSnapshot HumanAllIn()
@@ -243,7 +243,7 @@ namespace SoloPokering.Gameplay
             bannerMessage = table[0].Message;
             waitingForHumanInput = false;
 
-            return AutoPlayUntilHumanTurn();
+            return GetSnapshot();
         }
 
         public PokerGameSnapshot GetSnapshot()
