@@ -668,7 +668,7 @@ namespace SoloPokering.Gameplay
 
             if (seat.IsOccupied)
             {
-                snapshot.ChipStack = seat.ChipStack;
+                snapshot.ChipStack = handPlayer != null ? handPlayer.ChipStack : seat.ChipStack;
                 snapshot.IsDealer = handPlayer != null && handPlayer.IsDealer;
                 snapshot.IsSmallBlind = handPlayer != null && handPlayer.IsSmallBlind;
                 snapshot.IsBigBlind = handPlayer != null && handPlayer.IsBigBlind;
