@@ -62,7 +62,7 @@ public class SettingsPanelUI : MonoBehaviour
 
     void OnEnable()
     {
-        if (lobbyPanel != null) lobbyPanel.SetActive(false);
+        // if (lobbyPanel != null) lobbyPanel.SetActive(false);
 
         if (gameController != null && gameController.CurrentState != null)
         {
@@ -139,7 +139,7 @@ public class SettingsPanelUI : MonoBehaviour
 
     private void ClosePanel()
     {
-        if (lobbyPanel != null) lobbyPanel.SetActive(true);
+        // if (lobbyPanel != null) lobbyPanel.SetActive(true);
         
         gameObject.SetActive(false);
     }

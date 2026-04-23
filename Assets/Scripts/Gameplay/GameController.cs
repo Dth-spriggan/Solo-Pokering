@@ -78,6 +78,13 @@ namespace SoloPokering.Gameplay
             RefreshSnapshot();
         }
 
+        public void SetBotMode(PokerBotMode mode)
+        {
+            EnsureSession();
+            session.SetBotMode(mode);
+            RefreshSnapshot();
+        }
+
         public void QueueAddBot(string profileId)
         {
             EnsureSession();

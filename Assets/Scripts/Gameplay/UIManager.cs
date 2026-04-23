@@ -7,7 +7,8 @@ using System.Collections.Generic;
 public class UIManager : MonoBehaviour
 {
     [Header("Backend")]
-    public GameController gameController; 
+    public GameController gameController;
+    public CanvasGroup lobbyCanvasGroup;
 
     [Header("Panels")]
     public GameObject lobbyPanel;
@@ -16,7 +17,15 @@ public class UIManager : MonoBehaviour
     [Header("Lobby UI - Cơ bản")]
     public Button startButton;
     public Transform botListContainer; 
-    public GameObject botCardPrefab;   
+    public GameObject botCardPrefab;
+
+    [Header("GameOver UI")]
+    public GameObject gameOverPanel;
+    public AudioClip gameOverBGM;
+
+    [Header("Audio")]
+    public AudioSource bgmSource;
+    public AudioClip BGM;
 
     [Header("Lobby UI - Thông số Bàn (table in4)")]
     public TMP_Text turnTimerStatText;
@@ -45,6 +54,15 @@ public class UIManager : MonoBehaviour
     public Image[] communityCards;
     public Sprite cardBackSprite;
 
+    [Header("New UI - Settings & Info")]
+    public GameObject mainSettingsPanel; 
+    public GameObject handRankPanel;     
+    public Slider bgmSlider;            
+    public TMP_Text botModeText;
+
+    private string[] botModes = { "EASY", "MEDIUM", "HARD", "RANDOM" };
+    private int currentBotModeIndex = 1;
+
     private List<GameObject> activeBotCards = new List<GameObject>();
     private List<UISeat> activeSeats = new List<UISeat>();
     private string lastBotListHash = "";
@@ -59,13 +77,32 @@ public class UIManager : MonoBehaviour
         {
             gameController.SetTurnTimer(30);          
             gameController.SetStartingBank(1000);     
-            gameController.SetBlindValues(5, 10);     
+            gameController.SetBlindValues(5, 10);
+            ApplyBotModeSetting();
         }
         
         if (raiseSlider != null)
             raiseSlider.onValueChanged.AddListener(OnRaiseSliderChanged);
         
         if (raisePanel != null) raisePanel.SetActive(false);
+        if (mainSettingsPanel != null) mainSettingsPanel.SetActive(false);
+        if (handRankPanel != null) handRankPanel.SetActive(false);
+
+        if (bgmSource != null && BGM != null)
+        {
+            bgmSource.clip = BGM;
+            bgmSource.loop = true; // Cho nhạc lặp đi lặp lại không ngừng nghỉ
+            bgmSource.Play();
+
+            if (bgmSlider != null)
+            {
+                bgmSlider.value = bgmSource.volume;
+                bgmSlider.onValueChanged.AddListener(OnBGMSliderChanged);
+            }
+        }
+
+        UpdateBotModeUI();
+
     }
 
     void Update()
@@ -96,6 +133,65 @@ public class UIManager : MonoBehaviour
         UpdateLobbyBotList(state.BotQueryResults, isPlaying);
 
         HandleAutoPlay(state);
+    }
+
+    // ==========================================
+    // LOGIC CHO SETTINGS (HAND RANK, BGM, BOT MODE)
+    // ==========================================
+
+    // Bật/Tắt bảng Hand Rank (Gắn vào nút Dấu Hỏi "?")
+
+    
+    public void ToggleHandRankPanel()
+    {
+        if (handRankPanel != null)
+            handRankPanel.SetActive(!handRankPanel.activeSelf);
+    }
+
+    // Bật/Tắt bảng Main Settings (Gắn vào nút Bánh Răng)
+    public void ToggleMainSettingsPanel()
+{
+    bool isActive = !mainSettingsPanel.activeSelf;
+    mainSettingsPanel.SetActive(isActive);
+    
+    // Nếu Settings mở, khóa tương tác của Lobby. Nếu đóng, mở lại.
+    if (lobbyCanvasGroup != null)
+    {
+        lobbyCanvasGroup.interactable = !isActive;
+        lobbyCanvasGroup.blocksRaycasts = !isActive;
+    }
+}
+    public void OnClickConfirmMainSettings()
+    {
+        if (mainSettingsPanel != null)
+            mainSettingsPanel.SetActive(false);
+    }
+    // Chỉnh âm lượng (Gắn tự động ở hàm Start)
+    public void OnBGMSliderChanged(float vol)
+    {
+        if (bgmSource != null) bgmSource.volume = vol;
+    }
+
+    // Nút sang Trái (Left) của Bot Mode
+    public void OnClickPrevBotMode()
+    {
+        currentBotModeIndex--;
+        if (currentBotModeIndex < 0) currentBotModeIndex = botModes.Length - 1;
+        UpdateBotModeUI();
+    }
+
+    // Nút sang Phải (Right) của Bot Mode
+    public void OnClickNextBotMode()
+    {
+        currentBotModeIndex++;
+        if (currentBotModeIndex >= botModes.Length) currentBotModeIndex = 0;
+        UpdateBotModeUI();
+    }
+
+    private void UpdateBotModeUI()
+    {
+        if (botModeText != null) botModeText.text = botModes[currentBotModeIndex];
+        ApplyBotModeSetting();
     }
 
     // ==========================================
@@ -229,7 +325,21 @@ public class UIManager : MonoBehaviour
     public void OnRaiseSliderChanged(float val)
     {
         currentRaiseAmount = Mathf.RoundToInt(val);
-        if (raiseAmountText != null) raiseAmountText.text = "$" + currentRaiseAmount.ToString();
+        if (gameController != null && gameController.CurrentState != null)
+    {
+        PokerActionOptions options = gameController.CurrentState.HandSnapshot.HumanActionOptions;
+        
+        // Nếu không có ai Bet trước đó (Tức là đang Bet)
+        if (options.AmountToCall == 0)
+        {
+            if (raiseAmountText != null) 
+                raiseAmountText.text = "$" + currentRaiseAmount;
+        }
+        if (raiseAmountText != null) 
+    {
+        raiseAmountText.text = "$" + currentRaiseAmount.ToString();
+    }
+    }
     }
 
     public void OnClickConfirmRaise()
@@ -258,39 +368,60 @@ public class UIManager : MonoBehaviour
         return Resources.Load<Sprite>(resourceKey);
     }
 
-    private float botThinkTimer = 100f;
-    private float showdownTimer = 10f;
+    private float botThinkTimer = 0f;
+    private float showdownTimer = 0f;
     private void HandleAutoPlay(PokerTableSessionSnapshot state)
-    {
-        if (state.IsHandRunning && !state.HandSnapshot.IsWaitingForHumanInput)
-        {
-            botThinkTimer += Time.deltaTime;
-            if (botThinkTimer > 1.5f) 
-            {
-                botThinkTimer = 0f;
-                gameController.AdvanceAutoPlay(); 
-            }
-        }
-        else if (state.IsShowingResolvedHand)
-        {
-            showdownTimer += Time.deltaTime;
-            if (showdownTimer > 4.0f) 
-            {
-                showdownTimer = 0f;
-                if (activeSeats.Count > 0) 
-                {
-                    foreach (var s in activeSeats) if (s != null) Destroy(s.gameObject);
-                    activeSeats.Clear();
-                }
+{
+    // Nếu bảng Game Over đã bật rồi thì khóa chặt luồng AutoPlay lại luôn
+    if (gameOverPanel != null && gameOverPanel.activeSelf) 
+        return;
 
-                var humanSeat = state.Seats.Find(s => s.IsHuman);
-                if (humanSeat != null && humanSeat.ChipStack <= 0)
-                    gameController.ResetSession(); 
-                else
-                    gameController.StartNextHand(); 
+    var humanSeat = state.Seats.Find(s => s.IsHuman);
+    bool isHumanBusted = (humanSeat != null && humanSeat.ChipStack <= 0);
+
+    if (state.IsHandRunning && !state.HandSnapshot.IsWaitingForHumanInput)
+    {
+        botThinkTimer += Time.deltaTime;
+        if (botThinkTimer > 1.5f) 
+        {
+            botThinkTimer = 0f;
+            gameController.AdvanceAutoPlay(); 
+        }
+    }
+    else if (state.IsShowingResolvedHand)
+    {
+        // 1. Cứ đếm giờ bình thường để player ngắm bài
+        showdownTimer += Time.deltaTime;
+        
+        // 2. Chạm mốc 4 giây mới bắt đầu phân xử
+        if (showdownTimer > 4.0f) 
+        {
+            showdownTimer = 0f;
+
+            if (isHumanBusted)
+            {
+                // HẾT TIỀN: Hiện bảng Game Over và đổi nhạc
+                if (gameOverPanel != null)
+                {
+                    gameOverPanel.SetActive(true);
+                    
+                    // Xử lý Audio
+                    if (bgmSource != null && gameOverBGM != null)
+                    {
+                        bgmSource.clip = gameOverBGM;
+                        bgmSource.loop = true; // Nhạc thua thường chỉ phát 1 lần rồi im lặng
+                        bgmSource.Play();
+                    }
+                }
+            }
+            else
+            {
+                // CÒN TIỀN: Bắt đầu ván mới
+                gameController.StartNextHand(); 
             }
         }
     }
+}
 
     private void CacheOptionalReferences()
     {
@@ -325,4 +456,43 @@ public class UIManager : MonoBehaviour
     public void OnClickStartGame() => gameController.StartNextHand();
     public void OnClickFold() => gameController.HumanFold();
     public void OnClickCall() => gameController.HumanCheckOrCall();
+    public void OnClickBackToLobby()
+{
+    if (gameOverPanel != null) gameOverPanel.SetActive(false);
+    gameController.ResetSession();
+    if (bgmSource != null && BGM != null)
+    {
+        bgmSource.clip = BGM;
+        bgmSource.loop = true; // Bật lặp lại
+        bgmSource.Play();
+    }
+}
+
+// Hàm gán cho nút "Thoát Game"
+public void OnClickQuitGame()
+{
+    Debug.Log("Thoát game...");
+    Application.Quit();
+}
+    private void ApplyBotModeSetting()
+    {
+        if (gameController == null)
+            return;
+
+        PokerBotMode mode = PokerBotMode.Medium;
+        switch (currentBotModeIndex)
+        {
+            case 0:
+                mode = PokerBotMode.Easy;
+                break;
+            case 2:
+                mode = PokerBotMode.Hard;
+                break;
+            case 3:
+                mode = PokerBotMode.Random;
+                break;
+        }
+
+        gameController.SetBotMode(mode);
+    }
 }

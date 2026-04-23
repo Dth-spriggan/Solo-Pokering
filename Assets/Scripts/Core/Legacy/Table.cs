@@ -368,6 +368,7 @@ namespace Holdem
         //deal the flop
         public void DealFlop()
         {
+            deck.Deal(false);
             tableHand.Add(deck.Deal());
             tableHand.Add(deck.Deal());
             tableHand.Add(deck.Deal());
@@ -379,6 +380,7 @@ namespace Holdem
         //deal the turn
         public void DealTurn()
         {
+            deck.Deal(false);
             Card turn = deck.Deal();
             tableHand.Add(turn);
             for (int i = 0; i < players.Count; i++)
@@ -389,6 +391,7 @@ namespace Holdem
         //deal the river
         public void DealRiver()
         {
+            deck.Deal(false);
             Card river = deck.Deal();
             tableHand.Add(river);
             for (int i = 0; i < players.Count; i++)
@@ -449,26 +452,21 @@ namespace Holdem
                 return;
             }
 
-            mainPot.Amount /= Winners.Count;
-            if (Winners.Count > 1)
+            int splitAmount = mainPot.Amount / Winners.Count;
+            int oddChips = mainPot.Amount % Winners.Count;
+            List<int> sortedWinners = Winners.OrderBy(w => (w - dealerPosition + players.Count) % players.Count).ToList();
+
+            winnermessage = string.Empty;
+            foreach (int w in sortedWinners)
             {
-                for (int i = 0; i < this.getPlayers().Count; i++)
-                {
-                    if (Winners.Contains(i))
-                    {
-                        currentIndex = i;
-                        players[i].CollectMoney(mainPot);
-                        winnermessage += players[i].Name + ", ";
-                    }
-                }
-                winnermessage +=Environment.NewLine+ " split the pot.";
+                currentIndex = w;
+                // Ai ngồi gần Dealer hơn sẽ được ưu tiên +1 chip lẻ cho đến khi hết chip lẻ
+                int award = splitAmount + (oddChips > 0 ? 1 : 0); 
+                players[w].ChipStack += award;
+                winnermessage += players[w].Name + " wins " + award.ToString("c0") + ", ";
+                oddChips--;
             }
-            else
-            {
-                currentIndex = Winners[0];
-                players[currentIndex].CollectMoney(mainPot);
-                winnermessage = players[currentIndex].Message;
-            }
+            winnermessage += Environment.NewLine + " split the pot.";
             //awarding sidepots
             for (int i = 0; i < sidePots.Count; i++)
             {

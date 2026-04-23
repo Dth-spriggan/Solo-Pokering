@@ -5,7 +5,7 @@ using Holdem;
 namespace SoloPokering.Gameplay
 {
     /// <summary>
-    /// High-level table orchestration for a 7-seat offline table.
+    /// High-level table orchestration for an 8-seat offline table.
     /// It owns lobby state, avatar query results, seat reservations, and deferred add/kick operations.
     /// </summary>
     public sealed class PokerTableSession
@@ -20,28 +20,37 @@ namespace SoloPokering.Gameplay
             PokerSeatVisualPosition.BottomLeft,
             PokerSeatVisualPosition.LeftMid,
             PokerSeatVisualPosition.TopLeft,
+            PokerSeatVisualPosition.TopCenter,
             PokerSeatVisualPosition.TopRight,
             PokerSeatVisualPosition.RightMid,
             PokerSeatVisualPosition.BottomRight
         };
 
         // Fill top and side seats first so the table looks balanced as bots are added.
-        private static readonly int[] SeatJoinPriority = { 3, 4, 2, 5, 1, 6 };
-        private static readonly float[] SeatAnchorX = { 0.50f, 0.20f, 0.08f, 0.24f, 0.76f, 0.92f, 0.80f };
-        private static readonly float[] SeatAnchorY = { 0.13f, 0.22f, 0.48f, 0.79f, 0.79f, 0.48f, 0.22f };
+        private static readonly int[] SeatJoinPriority = { 4, 3, 5, 2, 6, 1, 7 };
+        private static readonly float[] SeatAnchorX = { 0.50f, 0.20f, 0.15f, 0.25f, 0.50f, 0.75f, 0.85f, 0.80f };
+        private static readonly float[] SeatAnchorY = { 0.18f, 0.32f, 0.52f, 0.80f, 0.86f, 0.80f, 0.52f, 0.32f };
 
         private readonly PokerMatchSettings settings;
         private readonly SeatRuntimeState[] seats;
         private readonly Dictionary<int, int> activePlayerSeatMap;
+        private readonly Random sessionRandom;
 
         private OfflinePokerGame currentGame;
         private PokerGameSnapshot currentHandSnapshot;
         private string botQuery;
         private string sessionMessage;
         private int completedHandCount;
+        private int lastDealerSeatIndex;
         private bool handRunning;
 
-        private readonly List<BotAvatarProfile> waitingRoom = new List<BotAvatarProfile>();
+        private sealed class QueuedBotReservation
+        {
+            public BotAvatarProfile Profile;
+            public DIFFICULTY Difficulty;
+        }
+
+        private readonly List<QueuedBotReservation> waitingRoom = new List<QueuedBotReservation>();
 
         private sealed class SeatRuntimeState
         {
@@ -52,6 +61,8 @@ namespace SoloPokering.Gameplay
             public int ChipStack;
             public BotAvatarProfile BotProfile;
             public BotAvatarProfile PendingJoinProfile;
+            public DIFFICULTY AssignedDifficulty;
+            public DIFFICULTY PendingJoinDifficulty;
             public bool PendingLeave;
 
             public bool IsOccupied
@@ -76,17 +87,27 @@ namespace SoloPokering.Gameplay
                 ChipStack = chipStack;
                 BotProfile = null;
                 PendingJoinProfile = null;
+                AssignedDifficulty = DIFFICULTY.MEDIUM;
+                PendingJoinDifficulty = DIFFICULTY.MEDIUM;
                 PendingLeave = false;
             }
 
-            public void SetBot(BotAvatarProfile profile, int chipStack)
+            public void SetBot(BotAvatarProfile profile, int chipStack, DIFFICULTY difficulty)
             {
                 IsHuman = false;
-                PlayerDefinition = profile.ToPlayerDefinition();
+                PlayerDefinition = PokerPlayerDefinition.Bot(profile.PlayingStyle, difficulty, profile.DisplayName);
                 ChipStack = chipStack;
                 BotProfile = profile;
                 PendingJoinProfile = null;
+                AssignedDifficulty = difficulty;
+                PendingJoinDifficulty = difficulty;
                 PendingLeave = false;
+            }
+
+            public void QueueBot(BotAvatarProfile profile, DIFFICULTY difficulty)
+            {
+                PendingJoinProfile = profile;
+                PendingJoinDifficulty = difficulty;
             }
 
             public void ClearBot()
@@ -98,6 +119,8 @@ namespace SoloPokering.Gameplay
                 ChipStack = 0;
                 BotProfile = null;
                 PendingJoinProfile = null;
+                AssignedDifficulty = DIFFICULTY.MEDIUM;
+                PendingJoinDifficulty = DIFFICULTY.MEDIUM;
                 PendingLeave = false;
             }
         }
@@ -111,6 +134,7 @@ namespace SoloPokering.Gameplay
 
             seats = new SeatRuntimeState[settings.MaximumPlayers];
             activePlayerSeatMap = new Dictionary<int, int>();
+            sessionRandom = new Random();
 
             for (int i = 0; i < seats.Length; i++)
             {
@@ -125,6 +149,7 @@ namespace SoloPokering.Gameplay
             botQuery = string.Empty;
             currentHandSnapshot = new PokerGameSnapshot();
             sessionMessage = "Table ready. Add bots, tweak the settings, then start the hand.";
+            lastDealerSeatIndex = -1;
         }
 
         public PokerMatchSettings Settings
@@ -171,39 +196,75 @@ namespace SoloPokering.Gameplay
             sessionMessage = "Blinds updated to " + settings.SmallBlind + "/" + settings.BigBlind + ".";
         }
 
+        public void SetBotMode(PokerBotMode mode)
+        {
+            settings.BotMode = mode;
+            switch (mode)
+            {
+                case PokerBotMode.Easy:
+                    settings.DefaultBotDifficulty = DIFFICULTY.EASY;
+                    break;
+                case PokerBotMode.Hard:
+                    settings.DefaultBotDifficulty = DIFFICULTY.HARD;
+                    break;
+                case PokerBotMode.Random:
+                    settings.DefaultBotDifficulty = DIFFICULTY.MEDIUM;
+                    break;
+                default:
+                    settings.DefaultBotDifficulty = DIFFICULTY.MEDIUM;
+                    break;
+            }
+
+            sessionMessage = "Bot mode set to " + mode + ".";
+        }
+
         public void SetBotQuery(string query)
         {
             botQuery = string.IsNullOrWhiteSpace(query) ? string.Empty : query.Trim();
         }
 
         public bool QueueAddBot(string profileId, out string feedback)
-{
-    BotAvatarProfile profile = BotAvatarProfile.GetById(profileId);
-    if (profile == null) { feedback = "Bot profile not found."; return false; }
+        {
+            BotAvatarProfile profile = BotAvatarProfile.GetById(profileId);
+            if (profile == null)
+            {
+                feedback = "Bot profile not found.";
+                return false;
+            }
 
     // Kiểm tra xem Bot này đã ngồi ở ghế hoặc đã nằm trong hàng chờ chưa
-    bool isAlreadyInWaitingRoom = waitingRoom.Exists(p => p.Id == profile.Id);
-    if (IsProfileAlreadyClaimed(profile.Id) || isAlreadyInWaitingRoom)
-    {
-        feedback = profile.DisplayName + " is already in line.";
-        return false;
-    }
+            bool isAlreadyInWaitingRoom = waitingRoom.Exists(reservation => reservation.Profile.Id == profile.Id);
+            if (IsProfileAlreadyClaimed(profile.Id) || isAlreadyInWaitingRoom)
+            {
+                feedback = profile.DisplayName + " is already in line.";
+                sessionMessage = feedback;
+                return false;
+            }
 
-    int targetSeatIndex = FindBestSeatForJoin();
+            DIFFICULTY difficulty = ResolveDifficultyForNewBot();
+            int targetSeatIndex = FindBestSeatForJoin();
     
     // NẾU HẾT GHẾ TRỐNG -> ĐẨY VÀO HÀNG CHỜ VÔ HẠN
     if (targetSeatIndex < 0)
     {
-        waitingRoom.Add(profile);
-        feedback = profile.DisplayName + " added to the global waiting queue.";
+        waitingRoom.Add(new QueuedBotReservation
+        {
+            Profile = profile,
+            Difficulty = difficulty
+        });
+
+        feedback = profile.DisplayName + " added to the waiting room.";
     }
     else
     {
         // Vẫn còn chỗ (hoặc chỗ đang chờ trống) -> Đặt chỗ vào ghế cụ thể
         SeatRuntimeState targetSeat = seats[targetSeatIndex];
-        if (handRunning) targetSeat.PendingJoinProfile = profile;
-        else targetSeat.SetBot(profile, settings.StartingBank);
-        feedback = profile.DisplayName + " reserved seat " + targetSeatIndex;
+        if (handRunning)
+            targetSeat.QueueBot(profile, difficulty);
+        else
+            targetSeat.SetBot(profile, settings.StartingBank, difficulty);
+
+        feedback = profile.DisplayName + " reserved seat " + targetSeatIndex + ".";
     }
 
     sessionMessage = feedback;
@@ -225,6 +286,7 @@ namespace SoloPokering.Gameplay
             {
                 string pendingName = seat.PendingJoinProfile.DisplayName;
                 seat.PendingJoinProfile = null;
+                seat.PendingJoinDifficulty = DIFFICULTY.MEDIUM;
                 feedback = "Cancelled queued join for " + pendingName + ".";
                 sessionMessage = feedback;
                 return true;
@@ -299,7 +361,10 @@ namespace SoloPokering.Gameplay
 
             PokerMatchSettings handSettings = settings.CreateCopy();
             currentGame = new OfflinePokerGame(handSettings);
-            currentGame.ConfigurePlayers(BuildConfiguredPlayersForNextHand());
+
+            int dealerPlayerIndex;
+            currentGame.ConfigurePlayers(BuildConfiguredPlayersForNextHand(out dealerPlayerIndex));
+            currentGame.SetNextDealerIndex(dealerPlayerIndex);
 
             currentHandSnapshot = currentGame.StartNewHand();
             handRunning = !IsHandResolved(currentHandSnapshot);
@@ -400,12 +465,16 @@ namespace SoloPokering.Gameplay
         private void FinalizeResolvedHand()
         {
             SyncSeatChipStacksFromResolvedHand();
+            RememberDealerSeatFromResolvedHand();
             handRunning = false;
             currentGame = null;
             completedHandCount++;
             sessionMessage = !string.IsNullOrWhiteSpace(currentHandSnapshot.WinnerMessage)
                 ? currentHandSnapshot.WinnerMessage
                 : currentHandSnapshot.BannerMessage;
+
+            if (seats[HumanSeatIndex].ChipStack <= 0)
+                sessionMessage = "Game over. You are out of chips.";
         }
 
         private void SyncSeatChipStacksFromResolvedHand()
@@ -423,10 +492,61 @@ namespace SoloPokering.Gameplay
             }
         }
 
-        private List<PokerConfiguredPlayer> BuildConfiguredPlayersForNextHand()
+        private void RememberDealerSeatFromResolvedHand()
+        {
+            if (currentHandSnapshot == null)
+                return;
+
+            for (int playerIndex = 0; playerIndex < currentHandSnapshot.Players.Count; playerIndex++)
+            {
+                PokerPlayerSnapshot player = currentHandSnapshot.Players[playerIndex];
+                if (!player.IsDealer)
+                    continue;
+
+                int seatIndex;
+                if (activePlayerSeatMap.TryGetValue(playerIndex, out seatIndex))
+                    lastDealerSeatIndex = seatIndex;
+
+                return;
+            }
+        }
+
+        private int ResolveDealerSeatIndexForNextHand()
+        {
+            if (lastDealerSeatIndex < 0)
+                return -1;
+
+            for (int offset = 1; offset <= seats.Length; offset++)
+            {
+                int seatIndex = (lastDealerSeatIndex + offset) % seats.Length;
+                if (seats[seatIndex].IsOccupied && seats[seatIndex].ChipStack > 0)
+                    return seatIndex;
+            }
+
+            return -1;
+        }
+
+        private DIFFICULTY ResolveDifficultyForNewBot()
+        {
+            switch (settings.BotMode)
+            {
+                case PokerBotMode.Easy:
+                    return DIFFICULTY.EASY;
+                case PokerBotMode.Hard:
+                    return DIFFICULTY.HARD;
+                case PokerBotMode.Random:
+                    return (DIFFICULTY)sessionRandom.Next(0, 3);
+                default:
+                    return DIFFICULTY.MEDIUM;
+            }
+        }
+
+        private List<PokerConfiguredPlayer> BuildConfiguredPlayersForNextHand(out int dealerPlayerIndex)
         {
             List<PokerConfiguredPlayer> configuredPlayers = new List<PokerConfiguredPlayer>();
             activePlayerSeatMap.Clear();
+            dealerPlayerIndex = -1;
+            int dealerSeatIndex = ResolveDealerSeatIndexForNextHand();
 
             int activeIndex = 0;
             for (int seatIndex = 0; seatIndex < seats.Length; seatIndex++)
@@ -437,6 +557,8 @@ namespace SoloPokering.Gameplay
 
                 configuredPlayers.Add(new PokerConfiguredPlayer(seat.PlayerDefinition, seat.ChipStack));
                 activePlayerSeatMap.Add(activeIndex, seatIndex);
+                if (seatIndex == dealerSeatIndex)
+                    dealerPlayerIndex = activeIndex;
                 activeIndex++;
             }
 
@@ -445,6 +567,11 @@ namespace SoloPokering.Gameplay
 
         private void ApplyPendingSeatChangesInternal()
         {
+            for (int i = 1; i < seats.Length; i++)
+            {
+                if (seats[i].IsOccupied && seats[i].ChipStack <= 0)
+                    seats[i].ClearBot();
+            }
             // Xóa những đứa đã đánh dấu rời bàn
             for (int i = 1; i < seats.Length; i++)
             {
@@ -458,7 +585,8 @@ namespace SoloPokering.Gameplay
                 if (seats[i].PendingJoinProfile != null)
                 {
                     BotAvatarProfile profile = seats[i].PendingJoinProfile;
-                    seats[i].SetBot(profile, settings.StartingBank);
+                    DIFFICULTY difficulty = seats[i].PendingJoinDifficulty;
+                    seats[i].SetBot(profile, settings.StartingBank, difficulty);
                 }
             }
 
@@ -468,7 +596,8 @@ namespace SoloPokering.Gameplay
                 int emptySeat = FindBestSeatForJoin();
                 if (emptySeat < 0) break; // Hết ghế trống thì ngưng
 
-                seats[emptySeat].SetBot(waitingRoom[0], settings.StartingBank);
+                QueuedBotReservation reservation = waitingRoom[0];
+                seats[emptySeat].SetBot(reservation.Profile, settings.StartingBank, reservation.Difficulty);
                 waitingRoom.RemoveAt(0); // Xóa khỏi hàng chờ
             }
         }
@@ -521,7 +650,7 @@ namespace SoloPokering.Gameplay
                 snapshot.AvatarDescription = seat.BotProfile.Description;
                 snapshot.AvatarAccentHex = seat.BotProfile.AccentHex;
                 snapshot.AvatarSecondaryHex = seat.BotProfile.SecondaryHex;
-                snapshot.DifficultyLabel = seat.BotProfile.Difficulty.ToString();
+                snapshot.DifficultyLabel = seat.AssignedDifficulty.ToString();
                 snapshot.PlayingStyleLabel = seat.BotProfile.PlayingStyle.ToString();
             }
             else if (seat.PendingJoinProfile != null)
@@ -533,7 +662,7 @@ namespace SoloPokering.Gameplay
                 snapshot.AvatarDescription = seat.PendingJoinProfile.Description;
                 snapshot.AvatarAccentHex = seat.PendingJoinProfile.AccentHex;
                 snapshot.AvatarSecondaryHex = seat.PendingJoinProfile.SecondaryHex;
-                snapshot.DifficultyLabel = seat.PendingJoinProfile.Difficulty.ToString();
+                snapshot.DifficultyLabel = seat.PendingJoinDifficulty.ToString();
                 snapshot.PlayingStyleLabel = seat.PendingJoinProfile.PlayingStyle.ToString();
             }
 
@@ -578,7 +707,7 @@ namespace SoloPokering.Gameplay
                 bool isMarkedForLeave = false;
 
                 // Kiểm tra xem nó có đang rớt vào list phòng chờ không
-                bool isWaitingInRoom = waitingRoom.Exists(p => p.Id == profile.Id);
+                bool isWaitingInRoom = waitingRoom.Exists(reservation => reservation.Profile.Id == profile.Id);
 
                 int seatedIndex = FindSeatByProfileId(profile.Id);
                 if (seatedIndex >= 0)
@@ -670,9 +799,6 @@ namespace SoloPokering.Gameplay
 
         private int FindBestSeatForJoin()
         {
-            if (GetProjectedOccupiedSeatCount() >= seats.Length)
-                return -1;
-
             for (int index = 0; index < SeatJoinPriority.Length; index++)
             {
                 int seatIndex = SeatJoinPriority[index];
@@ -752,6 +878,9 @@ namespace SoloPokering.Gameplay
                     count++;
             }
 
+            int emptyProjectedSeats = Math.Max(0, seats.Length - count);
+            count += Math.Min(waitingRoom.Count, emptyProjectedSeats);
+
             return count;
         }
 
@@ -769,12 +898,14 @@ namespace SoloPokering.Gameplay
                     count++;
             }
 
+            count += Math.Min(waitingRoom.Count, Math.Max(0, seats.Length - count));
+
             return count;
         }
 
         private int CountPendingJoins()
         {
-            int count = 0;
+            int count = waitingRoom.Count;
             for (int i = 0; i < seats.Length; i++)
             {
                 if (seats[i].PendingJoinProfile != null)

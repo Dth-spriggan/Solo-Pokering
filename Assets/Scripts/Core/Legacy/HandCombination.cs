@@ -131,11 +131,21 @@ namespace Holdem
                 
             }
             for (int i = 0; i <= hand.Count() - 4; i++)
-            {
-                int currentrank = hand.getCard(i).getRank(), currentsuit = hand.getCard(i).getSuit();
-                if (currentrank == 5 && hand.getCard(i + 1).getRank() == 4 && hand.getCard(i + 2).getRank() == 3 && hand.getCard(i + 3).getRank() == 2 && hand.getCard(0).getRank() == 14 && currentsuit == hand.getCard(i + 1).getSuit() && currentsuit == hand.getCard(i + 2).getSuit() && currentsuit == hand.getCard(i + 3).getSuit() && currentsuit == hand.getCard(0).getSuit())
-                    return true;
+{
+    int currentrank = hand.getCard(i).getRank(), currentsuit = hand.getCard(i).getSuit();
+    if (currentrank == 5 && hand.getCard(i + 1).getRank() == 4 && hand.getCard(i + 2).getRank() == 3 && hand.getCard(i + 3).getRank() == 2)
+    {
+        // Duyệt tìm xem có lá Át nào cùng chất với Sảnh này không
+        bool hasMatchingAce = false;
+        for (int j = 0; j < hand.Count(); j++) {
+            if (hand.getCard(j).getRank() == 14 && hand.getCard(j).getSuit() == currentsuit) {
+                hasMatchingAce = true;
+                break;
             }
+        }
+        if (hasMatchingAce) return true;
+    }
+}
             return false;
         }
         //get straight flush using two pointer variable and taking care of all cases
@@ -144,8 +154,14 @@ namespace Holdem
             hand.sortByRank();
             Hand straightflush = new Hand();
             straightflush.setValue(9);
-            if (hand.getCard(0).getRank() == 14)
-                hand.Add(new Card((int)RANK.ACE, hand.getCard(0).getSuit()));
+            int initialCount = hand.Count();
+int addedAces = 0;
+for(int i = 0; i < initialCount; i++) {
+    if (hand.getCard(i).getRank() == 14) {
+        hand.Add(new Card((int)RANK.ACE, hand.getCard(i).getSuit()));
+        addedAces++;
+    }
+}
             //int straightflushCount = 1;
             straightflush.Add(hand.getCard(0));
             int ptr1=0, ptr2=1;
@@ -182,7 +198,7 @@ namespace Holdem
                 }    
             }
             if (hand.getCard(0).getRank() == 14)
-                hand.Remove(hand.Count() - 1);
+                hand.Add(new Card((int)RANK.ACE, hand.getCard(0).getSuit()));
             if (straightflush.Count() < 5)
             {
                 straightflush.Clear();
@@ -465,7 +481,7 @@ namespace Holdem
             }
             //depending on the straight count, return true or false
             if (hand.getCard(0).getRank() == 14)
-                hand.Remove(hand.Count() - 1);
+                hand.Add(new Card((int)RANK.ACE, hand.getCard(0).getSuit()));
             if (straightCount != 5)
             {
                 straight.Clear();

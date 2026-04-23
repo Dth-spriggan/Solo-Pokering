@@ -270,6 +270,9 @@ namespace Holdem
         }
         public void Raise(int raise, Pot mainPot, int index)
         {
+            if (raise < mainPot.MinimumRaise) {
+                throw new InvalidOperationException("Lỗi Core: Lượng raise (" + raise + ") nhỏ hơn Minimum Raise (" + mainPot.MinimumRaise + ") cho phép.");
+            }
             int amount = mainPot.getMaximumAmountPutIn() + raise - amountInPot;
             if (ChipStack <= amount)
             {
@@ -346,27 +349,35 @@ namespace Holdem
         }
         public void AllIn(Pot mainPot,int index)
         {
-            AmountContributed = ChipStack;
-            if (mainPot.MinimumAllInAmount == 0)
-            {
-                mainPot.AmountInPotBeforeAllIn = mainPot.Amount;
-                mainPot.MinimumAllInAmount = ChipStack;
-            }
-            else if (chipStack < mainPot.MinimumAllInAmount)
-            {
-                mainPot.MinimumAllInAmount = ChipStack;
-            }
-            if (ChipStack > mainPot.MinimumRaise)
-                mainPot.MinimumRaise = ChipStack;
+            // Tính xem lượng chip thực tế đẩy vào vượt qua mức cao nhất hiện tại là bao nhiêu
+            int currentMaxPutIn = mainPot.getMaximumAmountPutIn();
+            int amountToCall = currentMaxPutIn - amountInPot;
+            int raiseAmount = ChipStack - amountToCall; // Nếu âm, đây là All-in short (ko đủ call)
+
+            AmountContributed += ChipStack;
             mainPot.AddPlayer(this);
             mainPot.Add(ChipStack);
             amountInPot += ChipStack;
             ChipStack = 0;
-            if(amountInPot>mainPot.getMaximumAmountPutIn())
+
+            // Nếu tạo ra mức cược lớn hơn mức hiện tại trên bàn
+            if (amountInPot > currentMaxPutIn)
+            {
                 mainPot.setMaximumAmount(amountInPot);
+        
+                // LUẬT CHUẨN: Chỉ re-open vòng cược (AgressorIndex) và set lại MinimumRaise 
+                // NẾU cú raise này lớn hơn hoặc bằng MinimumRaise hiện tại
+                if (raiseAmount >= mainPot.MinimumRaise)
+                {
+                    mainPot.MinimumRaise = raiseAmount;
+                    mainPot.AgressorIndex = index; 
+                }
+                // Nếu là Under-raise (raiseAmount < MinimumRaise), cố tình BỎ QUA việc 
+                // cập nhật AgressorIndex để vòng cược kết thúc đúng lúc.
+            }
+    
             Message = "I'm All-In";
             SimplifiedMessage = "ALL IN";
-            mainPot.AgressorIndex = index;
         }
         //reset the individual players
         public void Reset()

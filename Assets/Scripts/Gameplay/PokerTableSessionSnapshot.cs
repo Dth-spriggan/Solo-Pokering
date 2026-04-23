@@ -9,6 +9,7 @@ namespace SoloPokering.Gameplay
         BottomLeft,
         LeftMid,
         TopLeft,
+        TopCenter,
         TopRight,
         RightMid,
         BottomRight

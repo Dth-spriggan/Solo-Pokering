@@ -8,10 +8,18 @@ namespace SoloPokering.Gameplay
         Casual
     }
 
+    public enum PokerBotMode
+    {
+        Easy,
+        Medium,
+        Hard,
+        Random
+    }
+
     [Serializable]
     public sealed class PokerMatchSettings
     {
-        public const int RecommendedSeatCount = 7;
+        public const int RecommendedSeatCount = 8;
 
         public string HumanPlayerName = "You";
         public int StartingBank = 5000;
@@ -22,6 +30,7 @@ namespace SoloPokering.Gameplay
         public int MaximumPlayers = RecommendedSeatCount;
         public PokerPlayMode PlayMode = PokerPlayMode.Casual;
         public DIFFICULTY DefaultBotDifficulty = DIFFICULTY.MEDIUM;
+        public PokerBotMode BotMode = PokerBotMode.Medium;
 
         public void Validate()
         {
@@ -59,7 +68,8 @@ namespace SoloPokering.Gameplay
                 MinimumPlayers = MinimumPlayers,
                 MaximumPlayers = MaximumPlayers,
                 PlayMode = PlayMode,
-                DefaultBotDifficulty = DefaultBotDifficulty
+                DefaultBotDifficulty = DefaultBotDifficulty,
+                BotMode = BotMode
             };
         }
     }
